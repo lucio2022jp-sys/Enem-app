@@ -4,11 +4,37 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { carregarPerfil } from "@/lib/perfil/calcular";
 import { montarSimulado } from "@/lib/ai/montadorSimulado";
+import type { Area } from "@/types";
 
 const schema = z.object({
-  totalQuestoes: z.number().int().min(5).max(90).default(20),
-  tipo: z.enum(["PERSONALIZADO", "COMPLETO"]).default("PERSONALIZADO"),
+  totalQuestoes: z.number().int().min(5).max(180).default(20),
+  tipo: z
+    .enum([
+      "OFICIAL",
+      "AREA",
+      "TEMPO",
+      "FRAQUEZAS",
+      "LIVRE",
+      "PERSONALIZADO",
+      "COMPLETO",
+    ])
+    .default("PERSONALIZADO"),
+  areas: z
+    .array(z.enum(["LINGUAGENS", "HUMANAS", "NATUREZA", "MATEMATICA"]))
+    .optional(),
+  conteudos: z.array(z.string()).optional(),
+  duracaoMin: z.number().int().min(5).max(360).optional(),
 });
+
+const TITULOS: Record<string, string> = {
+  OFICIAL: "Simulado oficial",
+  AREA: "Simulado por área",
+  TEMPO: "Simulado cronometrado",
+  FRAQUEZAS: "Simulado de fraquezas",
+  LIVRE: "Simulado livre",
+  PERSONALIZADO: "Simulado personalizado",
+  COMPLETO: "Simulado completo",
+};
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -24,11 +50,18 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const perfil = await carregarPerfil(userId);
+
+  // OFICIAL ignora total recebido (sempre 180)
+  const totalReal =
+    parsed.data.tipo === "OFICIAL" ? 180 : parsed.data.totalQuestoes;
+
   const ids = await montarSimulado({
     userId,
     perfil,
-    totalQuestoes: parsed.data.totalQuestoes,
+    totalQuestoes: totalReal,
     tipo: parsed.data.tipo,
+    areas: parsed.data.areas as Area[] | undefined,
+    conteudos: parsed.data.conteudos,
   });
 
   if (ids.length === 0) {
@@ -38,11 +71,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const duracaoMin = Math.max(15, Math.round(ids.length * 2.5));
-  const titulo =
-    parsed.data.tipo === "COMPLETO"
-      ? "Simulado completo"
-      : "Simulado personalizado";
+  const duracaoMin =
+    parsed.data.duracaoMin ??
+    (parsed.data.tipo === "OFICIAL"
+      ? 330
+      : Math.max(15, Math.round(ids.length * 2.5)));
+
+  const titulo = TITULOS[parsed.data.tipo] ?? "Simulado";
 
   const sim = await prisma.simulado.create({
     data: {

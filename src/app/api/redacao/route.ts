@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { corrigirRedacao } from "@/lib/ai/corretorRedacao";
+import { aoEnviarRedacao } from "@/lib/eventos";
 
 const schema = z.object({
   tema: z.string().min(5).max(300),
@@ -76,5 +77,7 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ id: atualizada.id });
+  const ganhos = await aoEnviarRedacao(session.user.id);
+
+  return NextResponse.json({ id: atualizada.id, ganhos });
 }

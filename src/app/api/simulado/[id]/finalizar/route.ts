@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { parseJson } from "@/lib/utils";
 import { recalcularPerfil } from "@/lib/perfil/calcular";
 import { registrarRevisao } from "@/lib/revisao/agendar";
+import { aoFinalizarSimulado } from "@/lib/eventos";
 
 const schema = z.object({
   respostas: z.record(z.string(), z.string()),
@@ -73,6 +74,11 @@ export async function POST(
   });
 
   await recalcularPerfil(session.user.id);
+  const ganhos = await aoFinalizarSimulado({
+    userId: session.user.id,
+    acertos,
+    totalQuestoes: ids.length,
+  });
 
-  return NextResponse.json({ ok: true, notaEstimada });
+  return NextResponse.json({ ok: true, notaEstimada, ganhos });
 }

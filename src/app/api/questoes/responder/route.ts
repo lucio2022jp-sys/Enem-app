@@ -6,6 +6,8 @@ import { recalcularPerfil, carregarPerfil } from "@/lib/perfil/calcular";
 import { agendarRevisao } from "@/lib/revisao/agendar";
 import { classificarErro } from "@/lib/ai/classificadorErro";
 import { parseJson } from "@/lib/utils";
+import { aoResponderQuestao } from "@/lib/eventos";
+import type { Area } from "@/types";
 
 const schema = z.object({
   questionId: z.string(),
@@ -101,6 +103,12 @@ export async function POST(req: Request) {
 
   await agendarRevisao({ userId, questionId: questao.id, acerto: correto });
   await recalcularPerfil(userId);
+  const ganhos = await aoResponderQuestao({
+    userId,
+    area: questao.area as Area,
+    correta: correto,
+    tempoSegundos: parsed.data.tempoSegundos,
+  });
 
   return NextResponse.json({
     correta: correto,
@@ -112,5 +120,6 @@ export async function POST(req: Request) {
     dicas: parseJson<string[]>(questao.dicasJson, []),
     tipoErro,
     explicacaoErro,
+    ganhos,
   });
 }
