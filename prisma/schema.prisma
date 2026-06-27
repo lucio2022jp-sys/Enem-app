@@ -12,50 +12,74 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
+  id                   String   @id @default(cuid())
+  name                 String
+  email                String   @unique
+  password             String
   // role: ALUNO | PROFESSOR | ADMIN
-  role      String   @default("ALUNO")
+  role                 String   @default("ALUNO")
   // plan: FREE | PRO
-  plan      String   @default("FREE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  plan                 String   @default("FREE")
+  // Perfil pessoal (opcional)
+  fotoUrl              String?
+  cursoDesejado        String?
+  universidadeDesejada String?
+  notaDesejada         Int?
+  horasPorDia          Int?
+  // JSON string: ["seg","ter","qua","qui","sex","sab","dom"]
+  diasDisponiveisJson  String   @default("[]")
+  // horarioPreferido: MANHA | TARDE | NOITE
+  horarioPreferido     String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  attempts            Attempt[]
-  essays              Essay[]            @relation("AlunoEssays")
-  correcoesProfessor  Essay[]            @relation("CorretorEssays")
-  trackItems          TrackItem[]
-  studentProfile      StudentProfile?
-  diagnostico         DiagnosticResult?
-  simulados           Simulado[]
-  revisoes            Revisao[]
+  attempts           Attempt[]
+  essays             Essay[]           @relation("AlunoEssays")
+  correcoesProfessor Essay[]           @relation("CorretorEssays")
+  trackItems         TrackItem[]
+  studentProfile     StudentProfile?
+  diagnostico        DiagnosticResult?
+  simulados          Simulado[]
+  revisoes           Revisao[]
+  missoes            MissaoDiaria[]
+  dailyStats         DailyStats[]
 
   @@index([email])
 }
 
 model StudentProfile {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  totalQuestoes         Int      @default(0)
-  totalAcertos          Int      @default(0)
-  totalErros            Int      @default(0)
-  tempoMedioSegundos    Int      @default(0)
+  id                       String    @id @default(cuid())
+  userId                   String    @unique
+  totalQuestoes            Int       @default(0)
+  totalAcertos             Int       @default(0)
+  totalErros               Int       @default(0)
+  tempoMedioSegundos       Int       @default(0)
   // JSON string: { LINGUAGENS, HUMANAS, NATUREZA, MATEMATICA } 0-100
-  areaScoresJson        String   @default("{}")
+  areaScoresJson           String    @default("{}")
   // JSON string: { [competencia]: percentual }
-  competenciaScoresJson String   @default("{}")
+  competenciaScoresJson    String    @default("{}")
   // JSON string: { [habilidade]: percentual }
-  habilidadeScoresJson  String   @default("{}")
+  habilidadeScoresJson     String    @default("{}")
+  // JSON string: { [conteudo]: { area, total, acertos, pct } }
+  conteudoScoresJson       String    @default("{}")
   // JSON string: array de tags/conteúdos dominados
-  dominadosJson         String   @default("[]")
+  dominadosJson            String    @default("[]")
   // JSON string: array de tags/conteúdos fracos
-  fracosJson            String   @default("[]")
-  notaEstimadaEnem      Int?
-  ultimaAtualizacao     DateTime @default(now())
+  fracosJson               String    @default("[]")
+  // JSON string: array das matérias com dificuldade declarada no diagnóstico
+  dificuldadesIniciaisJson String    @default("[]")
+  notaInicialAproximada    Int?
+  notaEstimadaEnem         Int?
+  // Gamificação
+  xp                       Int       @default(0)
+  // nivel: INICIANTE | APRENDIZ | PERSISTENTE | ESTRATEGISTA | ELITE | ESPECIALISTA | MESTRE | LENDA_ENEM
+  nivel                    String    @default("INICIANTE")
+  streakDias               Int       @default(0)
+  melhorStreak             Int       @default(0)
+  ultimoDiaEstudo          DateTime?
+  ultimaAtualizacao        DateTime  @default(now())
   // JSON string: array de datas ISO distintas dos últimos 30 dias
-  frequenciaDiasJson    String   @default("[]")
+  frequenciaDiasJson       String    @default("[]")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -73,42 +97,42 @@ model DiagnosticResult {
 }
 
 model Question {
-  id                    String   @id @default(cuid())
-  year                  Int
+  id                       String   @id @default(cuid())
+  year                     Int
   // area: LINGUAGENS | HUMANAS | NATUREZA | MATEMATICA
-  area                  String
-  disciplina            String
-  competencia           String
-  habilidade            String
-  conteudo              String
-  subconteudo           String?
-  enunciado             String
-  alternativaA          String
-  alternativaB          String
-  alternativaC          String
-  alternativaD          String
-  alternativaE          String
+  area                     String
+  disciplina               String
+  competencia              String
+  habilidade               String
+  conteudo                 String
+  subconteudo              String?
+  enunciado                String
+  alternativaA             String
+  alternativaB             String
+  alternativaC             String
+  alternativaD             String
+  alternativaE             String
   // correta: A | B | C | D | E
-  correta               String
-  comentario            String
-  resolucaoPassoPasso   String
-  explicacaoSimplificada String
-  explicacaoDetalhada   String
+  correta                  String
+  comentario               String
+  resolucaoPassoPasso      String
+  explicacaoSimplificada   String
+  explicacaoDetalhada      String
   // JSON string arrays
-  conceitosJson         String   @default("[]")
-  assuntosRelacionadosJson String @default("[]")
-  dicasJson             String   @default("[]")
+  conceitosJson            String   @default("[]")
+  assuntosRelacionadosJson String   @default("[]")
+  dicasJson                String   @default("[]")
   // dificuldade: FACIL | MEDIO | DIFICIL
-  dificuldade           String
-  tempoMedioSegundos    Int      @default(180)
-  geradaPorIA           Boolean  @default(false)
-  originalQuestionId    String?
+  dificuldade              String
+  tempoMedioSegundos       Int      @default(180)
+  geradaPorIA              Boolean  @default(false)
+  originalQuestionId       String?
   // JSON string array
-  tagsJson              String   @default("[]")
-  vezesUtilizada        Int      @default(0)
-  percentualAcertos     Float    @default(0)
-  indiceDificuldade     Float    @default(0.5)
-  createdAt             DateTime @default(now())
+  tagsJson                 String   @default("[]")
+  vezesUtilizada           Int      @default(0)
+  percentualAcertos        Float    @default(0)
+  indiceDificuldade        Float    @default(0.5)
+  createdAt                DateTime @default(now())
 
   original  Question?  @relation("Variacoes", fields: [originalQuestionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   variacoes Question[] @relation("Variacoes")
@@ -122,17 +146,17 @@ model Question {
 }
 
 model Attempt {
-  id              String   @id @default(cuid())
-  userId          String
-  questionId      String
+  id             String   @id @default(cuid())
+  userId         String
+  questionId     String
   // escolhida: A | B | C | D | E
-  escolhida       String
-  correta         Boolean
-  tempoSegundos   Int
+  escolhida      String
+  correta        Boolean
+  tempoSegundos  Int
   // tipoErro: CONHECIMENTO|INTERPRETACAO|CALCULO|DISTRACAO|TEMPO|GRAFICO|TABELA|RACIOCINIO|CONCEITUAL|ESTRATEGIA|NENHUM
-  tipoErro        String?
-  explicacaoErro  String?
-  createdAt       DateTime @default(now())
+  tipoErro       String?
+  explicacaoErro String?
+  createdAt      DateTime @default(now())
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -143,25 +167,25 @@ model Attempt {
 }
 
 model Essay {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   userId              String
   tema                String
   texto               String
   // status: ENVIADA | EM_CORRECAO_IA | CORRIGIDA_IA | EM_REVISAO_HUMANA | CORRIGIDA_HUMANA
-  status              String   @default("ENVIADA")
+  status              String    @default("ENVIADA")
   corretorId          String?
-  c1                  Int      @default(0)
-  c2                  Int      @default(0)
-  c3                  Int      @default(0)
-  c4                  Int      @default(0)
-  c5                  Int      @default(0)
-  nota                Int      @default(0)
+  c1                  Int       @default(0)
+  c2                  Int       @default(0)
+  c3                  Int       @default(0)
+  c4                  Int       @default(0)
+  c5                  Int       @default(0)
+  nota                Int       @default(0)
   comentarioIA        String?
   comentarioProfessor String?
   reescrita           String?
   // JSON string array
   sugestoesJson       String?
-  enviadaEm           DateTime @default(now())
+  enviadaEm           DateTime  @default(now())
   corrigidaIAem       DateTime?
   corrigidaHumanaEm   DateTime?
 
@@ -173,19 +197,19 @@ model Essay {
 }
 
 model TrackItem {
-  id            String    @id @default(cuid())
-  userId        String
-  ordem         Int
-  titulo        String
-  descricao     String
+  id           String    @id @default(cuid())
+  userId       String
+  ordem        Int
+  titulo       String
+  descricao    String
   // tipo: QUESTOES | REDACAO | REVISAO | SIMULADO
-  tipo          String
+  tipo         String
   // area: LINGUAGENS | HUMANAS | NATUREZA | MATEMATICA | GERAL
-  area          String
-  alvoQuestoes  Int       @default(5)
-  concluido     Boolean   @default(false)
-  concluidoEm   DateTime?
-  createdAt     DateTime  @default(now())
+  area         String
+  alvoQuestoes Int       @default(5)
+  concluido    Boolean   @default(false)
+  concluidoEm  DateTime?
+  createdAt    DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -193,21 +217,21 @@ model TrackItem {
 }
 
 model Simulado {
-  id             String    @id @default(cuid())
-  userId         String
-  titulo         String
-  // tipo: PERSONALIZADO | COMPLETO
-  tipo           String
-  totalQuestoes  Int
-  duracaoMin     Int
-  iniciadoEm     DateTime  @default(now())
-  finalizadoEm   DateTime?
-  notaEstimada   Int?
+  id            String    @id @default(cuid())
+  userId        String
+  titulo        String
+  // tipo: TREINO | OFICIAL | PERSONALIZADO | DESAFIO | REVISAO | COMPLETO
+  tipo          String
+  totalQuestoes Int
+  duracaoMin    Int
+  iniciadoEm    DateTime  @default(now())
+  finalizadoEm  DateTime?
+  notaEstimada  Int?
   // JSON string array com IDs de questões em ordem
-  questionsJson  String
+  questionsJson String
   // JSON string: { [questionId]: { escolhida, tempoSegundos } }
-  respostasJson  String    @default("{}")
-  createdAt      DateTime  @default(now())
+  respostasJson String    @default("{}")
+  createdAt     DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -230,4 +254,49 @@ model Revisao {
   @@unique([userId, questionId])
   @@index([userId])
   @@index([proximaRevisao])
+}
+
+model MissaoDiaria {
+  id                  String    @id @default(cuid())
+  userId              String
+  data                DateTime
+  alvoLinguagens      Int       @default(0)
+  alvoHumanas         Int       @default(0)
+  alvoNatureza        Int       @default(0)
+  alvoMatematica      Int       @default(0)
+  alvoRedacao         Int       @default(0)
+  alvoRevisoes        Int       @default(0)
+  concluidoLinguagens Int       @default(0)
+  concluidoHumanas    Int       @default(0)
+  concluidoNatureza   Int       @default(0)
+  concluidoMatematica Int       @default(0)
+  concluidoRedacao    Int       @default(0)
+  concluidoRevisoes   Int       @default(0)
+  xpBase              Int       @default(50)
+  xpGanho             Int?
+  concluidaEm         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, data])
+  @@index([userId])
+}
+
+model DailyStats {
+  id                 String   @id @default(cuid())
+  userId             String
+  data               DateTime
+  questoesResolvidas Int      @default(0)
+  acertos            Int      @default(0)
+  tempoSegundos      Int      @default(0)
+  redacoes           Int      @default(0)
+  revisoes           Int      @default(0)
+  xpDia              Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, data])
+  @@index([userId, data])
 }
