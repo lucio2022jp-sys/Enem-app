@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { recalcularPerfil } from "@/lib/perfil/calcular";
 import { gerarTrilhaInicial } from "@/lib/trilha/gerar";
 import { agendarRevisao } from "@/lib/revisao/agendar";
+import { aoFinalizarDiagnostico } from "@/lib/eventos";
 
 const respostaSchema = z.object({
   questionId: z.string(),
@@ -14,6 +15,16 @@ const respostaSchema = z.object({
 
 const schema = z.object({
   respostas: z.array(respostaSchema).min(1),
+  preDiagnostico: z
+    .object({
+      dificuldades: z.array(z.string()).default([]),
+      autoavaliacao: z
+        .enum(["INICIANTE", "INTERMEDIARIO", "AVANCADO"])
+        .optional(),
+      objetivo: z.string().max(200).optional(),
+      horasDisponiveisSemana: z.number().int().min(0).max(80).optional(),
+    })
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -84,8 +95,37 @@ export async function POST(req: Request) {
     },
   });
 
+  // Pré-diagnóstico → grava no StudentProfile
+  if (parsed.data.preDiagnostico) {
+    const pd = parsed.data.preDiagnostico;
+    const dadosPre = {
+      dificuldades: pd.dificuldades,
+      autoavaliacao: pd.autoavaliacao ?? null,
+      objetivo: pd.objetivo ?? null,
+      horasDisponiveisSemana: pd.horasDisponiveisSemana ?? null,
+    };
+    // calcula nota inicial aproximada via média ponderada das áreas (mesma escala 400-1000)
+    const mediaPct =
+      Object.values(areaScores).reduce((s, v) => s + v, 0) /
+      Math.max(1, Object.values(areaScores).length);
+    const notaInicialAproximada = Math.round(400 + (mediaPct / 100) * 600);
+    await prisma.studentProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        dificuldadesIniciaisJson: JSON.stringify(dadosPre),
+        notaInicialAproximada,
+      },
+      update: {
+        dificuldadesIniciaisJson: JSON.stringify(dadosPre),
+        notaInicialAproximada,
+      },
+    });
+  }
+
   await recalcularPerfil(userId);
   await gerarTrilhaInicial(userId, { areaScores });
+  await aoFinalizarDiagnostico(userId);
 
   return NextResponse.json({ ok: true, areaScores });
 }
