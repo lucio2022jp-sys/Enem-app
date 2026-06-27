@@ -37,6 +37,11 @@ export default async function SimuladoListaPage() {
           icon={<Trophy className="h-6 w-6" />}
           title="Sem simulados ainda"
           description="Monte seu primeiro simulado personalizado em poucos segundos."
+          action={
+            <Link href="/simulado/novo">
+              <Button>Criar simulado</Button>
+            </Link>
+          }
         />
       ) : (
         <ul className="space-y-2">
