@@ -1,0 +1,233 @@
+// Prisma schema para SQLite.
+// SQLite não suporta enums nativos. Campos com valores controlados usam String
+// e os valores válidos estão documentados nos comentários.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  // role: ALUNO | PROFESSOR | ADMIN
+  role      String   @default("ALUNO")
+  // plan: FREE | PRO
+  plan      String   @default("FREE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attempts            Attempt[]
+  essays              Essay[]            @relation("AlunoEssays")
+  correcoesProfessor  Essay[]            @relation("CorretorEssays")
+  trackItems          TrackItem[]
+  studentProfile      StudentProfile?
+  diagnostico         DiagnosticResult?
+  simulados           Simulado[]
+  revisoes            Revisao[]
+
+  @@index([email])
+}
+
+model StudentProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  totalQuestoes         Int      @default(0)
+  totalAcertos          Int      @default(0)
+  totalErros            Int      @default(0)
+  tempoMedioSegundos    Int      @default(0)
+  // JSON string: { LINGUAGENS, HUMANAS, NATUREZA, MATEMATICA } 0-100
+  areaScoresJson        String   @default("{}")
+  // JSON string: { [competencia]: percentual }
+  competenciaScoresJson String   @default("{}")
+  // JSON string: { [habilidade]: percentual }
+  habilidadeScoresJson  String   @default("{}")
+  // JSON string: array de tags/conteúdos dominados
+  dominadosJson         String   @default("[]")
+  // JSON string: array de tags/conteúdos fracos
+  fracosJson            String   @default("[]")
+  notaEstimadaEnem      Int?
+  ultimaAtualizacao     DateTime @default(now())
+  // JSON string: array de datas ISO distintas dos últimos 30 dias
+  frequenciaDiasJson    String   @default("[]")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DiagnosticResult {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  // JSON string: { LINGUAGENS, HUMANAS, NATUREZA, MATEMATICA }
+  areaScoresJson String
+  completedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id                    String   @id @default(cuid())
+  year                  Int
+  // area: LINGUAGENS | HUMANAS | NATUREZA | MATEMATICA
+  area                  String
+  disciplina            String
+  competencia           String
+  habilidade            String
+  conteudo              String
+  subconteudo           String?
+  enunciado             String
+  alternativaA          String
+  alternativaB          String
+  alternativaC          String
+  alternativaD          String
+  alternativaE          String
+  // correta: A | B | C | D | E
+  correta               String
+  comentario            String
+  resolucaoPassoPasso   String
+  explicacaoSimplificada String
+  explicacaoDetalhada   String
+  // JSON string arrays
+  conceitosJson         String   @default("[]")
+  assuntosRelacionadosJson String @default("[]")
+  dicasJson             String   @default("[]")
+  // dificuldade: FACIL | MEDIO | DIFICIL
+  dificuldade           String
+  tempoMedioSegundos    Int      @default(180)
+  geradaPorIA           Boolean  @default(false)
+  originalQuestionId    String?
+  // JSON string array
+  tagsJson              String   @default("[]")
+  vezesUtilizada        Int      @default(0)
+  percentualAcertos     Float    @default(0)
+  indiceDificuldade     Float    @default(0.5)
+  createdAt             DateTime @default(now())
+
+  original  Question?  @relation("Variacoes", fields: [originalQuestionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  variacoes Question[] @relation("Variacoes")
+  attempts  Attempt[]
+  revisoes  Revisao[]
+
+  @@index([area])
+  @@index([dificuldade])
+  @@index([conteudo])
+  @@index([originalQuestionId])
+}
+
+model Attempt {
+  id              String   @id @default(cuid())
+  userId          String
+  questionId      String
+  // escolhida: A | B | C | D | E
+  escolhida       String
+  correta         Boolean
+  tempoSegundos   Int
+  // tipoErro: CONHECIMENTO|INTERPRETACAO|CALCULO|DISTRACAO|TEMPO|GRAFICO|TABELA|RACIOCINIO|CONCEITUAL|ESTRATEGIA|NENHUM
+  tipoErro        String?
+  explicacaoErro  String?
+  createdAt       DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([questionId])
+  @@index([userId, createdAt])
+}
+
+model Essay {
+  id                  String   @id @default(cuid())
+  userId              String
+  tema                String
+  texto               String
+  // status: ENVIADA | EM_CORRECAO_IA | CORRIGIDA_IA | EM_REVISAO_HUMANA | CORRIGIDA_HUMANA
+  status              String   @default("ENVIADA")
+  corretorId          String?
+  c1                  Int      @default(0)
+  c2                  Int      @default(0)
+  c3                  Int      @default(0)
+  c4                  Int      @default(0)
+  c5                  Int      @default(0)
+  nota                Int      @default(0)
+  comentarioIA        String?
+  comentarioProfessor String?
+  reescrita           String?
+  // JSON string array
+  sugestoesJson       String?
+  enviadaEm           DateTime @default(now())
+  corrigidaIAem       DateTime?
+  corrigidaHumanaEm   DateTime?
+
+  user     User  @relation("AlunoEssays", fields: [userId], references: [id], onDelete: Cascade)
+  corretor User? @relation("CorretorEssays", fields: [corretorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TrackItem {
+  id            String    @id @default(cuid())
+  userId        String
+  ordem         Int
+  titulo        String
+  descricao     String
+  // tipo: QUESTOES | REDACAO | REVISAO | SIMULADO
+  tipo          String
+  // area: LINGUAGENS | HUMANAS | NATUREZA | MATEMATICA | GERAL
+  area          String
+  alvoQuestoes  Int       @default(5)
+  concluido     Boolean   @default(false)
+  concluidoEm   DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Simulado {
+  id             String    @id @default(cuid())
+  userId         String
+  titulo         String
+  // tipo: PERSONALIZADO | COMPLETO
+  tipo           String
+  totalQuestoes  Int
+  duracaoMin     Int
+  iniciadoEm     DateTime  @default(now())
+  finalizadoEm   DateTime?
+  notaEstimada   Int?
+  // JSON string array com IDs de questões em ordem
+  questionsJson  String
+  // JSON string: { [questionId]: { escolhida, tempoSegundos } }
+  respostasJson  String    @default("{}")
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Revisao {
+  id             String   @id @default(cuid())
+  userId         String
+  questionId     String
+  proximaRevisao DateTime
+  intervaloDias  Int      @default(1)
+  nivelDominio   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@index([proximaRevisao])
+}
