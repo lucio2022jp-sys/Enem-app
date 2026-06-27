@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { authConfig } from "@/lib/auth.config";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -10,10 +11,7 @@ const credentialsSchema = z.object({
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: "jwt" },
-  pages: { signIn: "/entrar" },
-  trustHost: true,
-  secret: process.env.AUTH_SECRET,
+  ...authConfig,
   providers: [
     Credentials({
       name: "credentials",
@@ -44,13 +42,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
         token.id = (user as any).id;
         token.role = (user as any).role;
         token.plan = (user as any).plan;
       } else if (token?.id) {
-        // refresh role/plan on each request
         const db = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { role: true, plan: true, name: true },
@@ -62,14 +60,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id as string;
-        (session.user as any).role = token.role as string;
-        (session.user as any).plan = token.plan as string;
-      }
-      return session;
     },
   },
 });

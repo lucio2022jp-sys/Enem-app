@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 const APP_PREFIXES = [
   "/inicio",
@@ -11,13 +13,15 @@ const APP_PREFIXES = [
   "/simulado",
   "/conta",
   "/planos",
+  "/mapa",
+  "/painel",
 ];
 
 const PROFESSOR_PREFIX = "/professor";
 
-export default async function middleware(req: NextRequest) {
+export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const session = await auth();
+  const session = req.auth;
 
   const isApp = APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
   const isProfessor = pathname === PROFESSOR_PREFIX || pathname.startsWith(PROFESSOR_PREFIX + "/");
@@ -39,7 +43,7 @@ export default async function middleware(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
