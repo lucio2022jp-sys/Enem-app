@@ -27,6 +27,33 @@ export type StatusEssay =
 
 export type TipoTrack = "QUESTOES" | "REDACAO" | "REVISAO" | "SIMULADO";
 
+export type Nivel =
+  | "INICIANTE"
+  | "APRENDIZ"
+  | "PERSISTENTE"
+  | "ESTRATEGISTA"
+  | "ELITE"
+  | "ESPECIALISTA"
+  | "MESTRE"
+  | "LENDA_ENEM";
+
+export type HorarioPreferido = "MANHA" | "TARDE" | "NOITE";
+
+export type TipoSimulado =
+  | "TREINO"
+  | "OFICIAL"
+  | "PERSONALIZADO"
+  | "DESAFIO"
+  | "REVISAO"
+  | "COMPLETO";
+
+export interface ConteudoScore {
+  area: string;
+  total: number;
+  acertos: number;
+  pct: number;
+}
+
 export interface PerfilAluno {
   totalQuestoes: number;
   totalAcertos: number;
@@ -35,10 +62,15 @@ export interface PerfilAluno {
   areaScores: Record<string, number>;
   competenciaScores: Record<string, number>;
   habilidadeScores: Record<string, number>;
+  conteudoScores: Record<string, ConteudoScore>;
   dominados: string[];
   fracos: string[];
   notaEstimadaEnem: number | null;
   frequenciaDias: string[];
+  xp: number;
+  nivel: Nivel;
+  streakDias: number;
+  melhorStreak: number;
   ultimosErros?: Array<{
     enunciado: string;
     conteudo: string;

@@ -66,3 +66,26 @@ export function safeStringify(value: unknown): string {
 export function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
+
+/** Retorna a data com hora zerada (00:00:00.000) no fuso local. */
+export function inicioDoDia(d: Date = new Date()): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** Diferença em dias de calendário (positivo se b > a). */
+export function diasEntre(a: Date, b: Date): number {
+  const ms = inicioDoDia(b).getTime() - inicioDoDia(a).getTime();
+  return Math.round(ms / 86400000);
+}
+
+/** Formata segundos como "1h 23min" ou "23min" ou "0min". */
+export function formatarTempo(segundos: number): string {
+  if (!segundos || segundos <= 0) return "0min";
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  if (h > 0 && m > 0) return `${h}h ${m}min`;
+  if (h > 0) return `${h}h`;
+  return `${m}min`;
+}

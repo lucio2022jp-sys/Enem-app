@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { parseJson, clamp } from "@/lib/utils";
-import type { PerfilAluno } from "@/types";
+import type { PerfilAluno, ConteudoScore, Nivel } from "@/types";
 
 const AREAS = ["LINGUAGENS", "HUMANAS", "NATUREZA", "MATEMATICA"] as const;
 
@@ -31,10 +31,13 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
     areaScores[area] = Math.round((ac / ofArea.length) * 100);
   }
 
-  // Competências
+  // Competências / Habilidades / Conteúdo
   const competenciaMap = new Map<string, { total: number; acertos: number }>();
   const habilidadeMap = new Map<string, { total: number; acertos: number }>();
-  const conteudoMap = new Map<string, { total: number; acertos: number }>();
+  const conteudoMap = new Map<
+    string,
+    { total: number; acertos: number; area: string }
+  >();
 
   for (const a of attempts) {
     const c = a.question.competencia || "—";
@@ -42,21 +45,25 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
     const k = a.question.conteudo || "—";
     bumpMap(competenciaMap, c, a.correta);
     bumpMap(habilidadeMap, h, a.correta);
-    bumpMap(conteudoMap, k, a.correta);
+    const cur = conteudoMap.get(k) ?? { total: 0, acertos: 0, area: a.question.area };
+    cur.total += 1;
+    if (a.correta) cur.acertos += 1;
+    conteudoMap.set(k, cur);
   }
 
   const competenciaScores = pctMap(competenciaMap);
   const habilidadeScores = pctMap(habilidadeMap);
-
+  const conteudoScores: Record<string, ConteudoScore> = {};
   const dominados: string[] = [];
   const fracos: string[] = [];
   for (const [key, v] of conteudoMap) {
-    const pct = (v.acertos / v.total) * 100;
+    const pct = v.total > 0 ? Math.round((v.acertos / v.total) * 100) : 0;
+    conteudoScores[key] = { area: v.area, total: v.total, acertos: v.acertos, pct };
     if (v.total >= 5 && pct >= 80) dominados.push(key);
     if (v.total >= 3 && pct < 50) fracos.push(key);
   }
 
-  // Nota estimada ENEM: média ponderada por área
+  // Nota estimada ENEM
   const validas = AREAS.filter((a) =>
     attempts.some((at) => at.question.area === a),
   );
@@ -78,7 +85,7 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
   }
   const frequenciaDias = Array.from(datas).sort();
 
-  // Últimos erros (com tipoErro)
+  // Últimos erros
   const ultimosErros = attempts
     .filter((a) => !a.correta)
     .slice(-5)
@@ -88,21 +95,6 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
       tipoErro: a.tipoErro ?? null,
       area: a.question.area,
     }));
-
-  const perfil: PerfilAluno = {
-    totalQuestoes: total,
-    totalAcertos: acertos,
-    totalErros: erros,
-    tempoMedioSegundos: tempoMedio,
-    areaScores,
-    competenciaScores,
-    habilidadeScores,
-    dominados,
-    fracos,
-    notaEstimadaEnem: notaEstimada,
-    frequenciaDias,
-    ultimosErros,
-  };
 
   await prisma.studentProfile.upsert({
     where: { userId },
@@ -115,6 +107,7 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
       areaScoresJson: JSON.stringify(areaScores),
       competenciaScoresJson: JSON.stringify(competenciaScores),
       habilidadeScoresJson: JSON.stringify(habilidadeScores),
+      conteudoScoresJson: JSON.stringify(conteudoScores),
       dominadosJson: JSON.stringify(dominados),
       fracosJson: JSON.stringify(fracos),
       notaEstimadaEnem: notaEstimada,
@@ -128,6 +121,7 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
       areaScoresJson: JSON.stringify(areaScores),
       competenciaScoresJson: JSON.stringify(competenciaScores),
       habilidadeScoresJson: JSON.stringify(habilidadeScores),
+      conteudoScoresJson: JSON.stringify(conteudoScores),
       dominadosJson: JSON.stringify(dominados),
       fracosJson: JSON.stringify(fracos),
       notaEstimadaEnem: notaEstimada,
@@ -135,6 +129,28 @@ export async function recalcularPerfil(userId: string): Promise<PerfilAluno> {
       ultimaAtualizacao: new Date(),
     },
   });
+
+  const sp = await prisma.studentProfile.findUnique({ where: { userId } });
+
+  const perfil: PerfilAluno = {
+    totalQuestoes: total,
+    totalAcertos: acertos,
+    totalErros: erros,
+    tempoMedioSegundos: tempoMedio,
+    areaScores,
+    competenciaScores,
+    habilidadeScores,
+    conteudoScores,
+    dominados,
+    fracos,
+    notaEstimadaEnem: notaEstimada,
+    frequenciaDias,
+    xp: sp?.xp ?? 0,
+    nivel: (sp?.nivel as Nivel) ?? "INICIANTE",
+    streakDias: sp?.streakDias ?? 0,
+    melhorStreak: sp?.melhorStreak ?? 0,
+    ultimosErros,
+  };
 
   return perfil;
 }
@@ -171,9 +187,14 @@ export async function carregarPerfil(userId: string): Promise<PerfilAluno | null
     areaScores: parseJson(sp.areaScoresJson, {}),
     competenciaScores: parseJson(sp.competenciaScoresJson, {}),
     habilidadeScores: parseJson(sp.habilidadeScoresJson, {}),
+    conteudoScores: parseJson(sp.conteudoScoresJson, {}),
     dominados: parseJson(sp.dominadosJson, []),
     fracos: parseJson(sp.fracosJson, []),
     notaEstimadaEnem: sp.notaEstimadaEnem,
     frequenciaDias: parseJson(sp.frequenciaDiasJson, []),
+    xp: sp.xp,
+    nivel: sp.nivel as Nivel,
+    streakDias: sp.streakDias,
+    melhorStreak: sp.melhorStreak,
   };
 }

@@ -2,11 +2,22 @@ import { prisma } from "@/lib/prisma";
 import { gerarQuestaoIA } from "./geradorQuestao";
 import type { PerfilAluno, Area } from "@/types";
 
+export type ModoSimulado =
+  | "OFICIAL"
+  | "AREA"
+  | "TEMPO"
+  | "FRAQUEZAS"
+  | "LIVRE"
+  | "PERSONALIZADO"
+  | "COMPLETO";
+
 export interface MontarSimuladoArgs {
   userId: string;
   perfil?: PerfilAluno | null;
   totalQuestoes: number;
-  tipo: "PERSONALIZADO" | "COMPLETO";
+  tipo: ModoSimulado;
+  areas?: Area[];
+  conteudos?: string[];
 }
 
 /**
@@ -19,11 +30,8 @@ export interface MontarSimuladoArgs {
  * gera com IA (quando disponível).
  */
 export async function montarSimulado(args: MontarSimuladoArgs): Promise<string[]> {
-  const { userId, perfil, totalQuestoes } = args;
+  const { userId, perfil, totalQuestoes, tipo, areas, conteudos } = args;
   const total = Math.max(5, totalQuestoes);
-
-  const qtdFracos = Math.round(total * 0.6);
-  const qtdRevisao = Math.round(total * 0.25);
 
   const jaRespondidas = await prisma.attempt.findMany({
     where: { userId },
@@ -31,9 +39,108 @@ export async function montarSimulado(args: MontarSimuladoArgs): Promise<string[]
     distinct: ["questionId"],
   });
   const idsRespondidos = jaRespondidas.map((a) => a.questionId);
-
-  const areasFracas = ordenarAreasFracas(perfil);
   const selecionadas = new Set<string>();
+
+  // Filtros por modo
+  const areasFiltro: Area[] | undefined =
+    areas && areas.length > 0 ? areas : undefined;
+  const conteudosFiltro =
+    conteudos && conteudos.length > 0 ? conteudos : undefined;
+
+  // Modo OFICIAL: distribuição 45/45/45/45 ENEM, ignora filtros
+  if (tipo === "OFICIAL") {
+    const distrib: Array<[Area, number]> = [
+      ["LINGUAGENS", 45],
+      ["HUMANAS", 45],
+      ["NATUREZA", 45],
+      ["MATEMATICA", 45],
+    ];
+    for (const [area, qtd] of distrib) {
+      const candidatos = await prisma.question.findMany({
+        where: { area, id: { notIn: Array.from(selecionadas) } },
+        orderBy: { createdAt: "desc" },
+        take: qtd,
+      });
+      for (const c of candidatos) selecionadas.add(c.id);
+    }
+    return Array.from(selecionadas).slice(0, 180);
+  }
+
+  // Modo FRAQUEZAS: 100% fracos
+  if (tipo === "FRAQUEZAS") {
+    const areasFracas = ordenarAreasFracas(perfil);
+    for (const area of areasFracas) {
+      if (selecionadas.size >= total) break;
+      const candidatos = await prisma.question.findMany({
+        where: {
+          area,
+          id: { notIn: Array.from(selecionadas).concat(idsRespondidos) },
+        },
+        orderBy: [{ indiceDificuldade: "asc" }, { createdAt: "asc" }],
+        take: total,
+      });
+      for (const c of candidatos) {
+        if (selecionadas.size >= total) break;
+        selecionadas.add(c.id);
+      }
+    }
+    // fallback: ignora idsRespondidos se faltar
+    if (selecionadas.size < total) {
+      for (const area of areasFracas) {
+        if (selecionadas.size >= total) break;
+        const extras = await prisma.question.findMany({
+          where: { area, id: { notIn: Array.from(selecionadas) } },
+          take: total,
+        });
+        for (const c of extras) {
+          if (selecionadas.size >= total) break;
+          selecionadas.add(c.id);
+        }
+      }
+    }
+    return Array.from(selecionadas).sort(() => Math.random() - 0.5).slice(0, total);
+  }
+
+  // Modos AREA, TEMPO, LIVRE: usa filtros + distribuição simples
+  if (tipo === "AREA" || tipo === "TEMPO" || tipo === "LIVRE") {
+    const where: {
+      area?: { in: Area[] };
+      conteudo?: { in: string[] };
+      id?: { notIn: string[] };
+    } = {};
+    if (areasFiltro) where.area = { in: areasFiltro };
+    if (conteudosFiltro) where.conteudo = { in: conteudosFiltro };
+
+    const candidatos = await prisma.question.findMany({
+      where: {
+        ...where,
+        id: { notIn: idsRespondidos },
+      },
+      orderBy: { createdAt: "desc" },
+      take: total * 2,
+    });
+    for (const c of candidatos) {
+      if (selecionadas.size >= total) break;
+      selecionadas.add(c.id);
+    }
+    // fallback ignora respondidas
+    if (selecionadas.size < total) {
+      const extras = await prisma.question.findMany({
+        where: { ...where, id: { notIn: Array.from(selecionadas) } },
+        take: total,
+      });
+      for (const c of extras) {
+        if (selecionadas.size >= total) break;
+        selecionadas.add(c.id);
+      }
+    }
+    return Array.from(selecionadas).sort(() => Math.random() - 0.5).slice(0, total);
+  }
+
+  // Modos PERSONALIZADO e COMPLETO (mantém a estratégia antiga 60/25/15)
+  const qtdFracos = Math.round(total * 0.6);
+  const qtdRevisao = Math.round(total * 0.25);
+  const areasFracas = ordenarAreasFracas(perfil);
 
   // 1. Fracos
   for (const area of areasFracas) {
@@ -79,7 +186,7 @@ export async function montarSimulado(args: MontarSimuladoArgs): Promise<string[]
     for (const n of novas) selecionadas.add(n.id);
   }
 
-  // 4. Se ainda faltar, gerar com IA
+  // 4. IA
   let faltam = total - selecionadas.size;
   let tentativas = 0;
   while (faltam > 0 && tentativas < Math.min(faltam, 5)) {
