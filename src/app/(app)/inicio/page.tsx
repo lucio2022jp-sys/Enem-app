@@ -5,6 +5,12 @@ import {
   Sparkles,
   BookCheck,
   ArrowRight,
+  Flame,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Trophy,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -14,8 +20,56 @@ import { BarChart } from "@/components/BarChart";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { AREAS, parseJson } from "@/lib/utils";
+import { nivelDeXP } from "@/lib/gamificacao";
+import { ranking7d, ultimosNDias } from "@/lib/daily";
+import { getOuCriarMissaoHoje, progressoMissao } from "@/lib/missao";
 
 export const dynamic = "force-dynamic";
+
+function fmtTempo(seg: number): string {
+  if (seg < 60) return `${seg}s`;
+  const m = Math.floor(seg / 60);
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  return `${h}h${(m % 60).toString().padStart(2, "0")}`;
+}
+
+function Delta({
+  atual,
+  anterior,
+  sufixo = "",
+}: {
+  atual: number;
+  anterior: number;
+  sufixo?: string;
+}) {
+  const diff = atual - anterior;
+  if (anterior === 0 && atual === 0) {
+    return (
+      <span className="inline-flex items-center text-xs text-slate-500">
+        <Minus className="mr-1 h-3 w-3" /> sem dados
+      </span>
+    );
+  }
+  if (diff === 0) {
+    return (
+      <span className="inline-flex items-center text-xs text-slate-500">
+        <Minus className="mr-1 h-3 w-3" /> igual
+      </span>
+    );
+  }
+  const positivo = diff > 0;
+  const Icon = positivo ? TrendingUp : TrendingDown;
+  const cor = positivo ? "text-emerald-600" : "text-rose-600";
+  return (
+    <span className={`inline-flex items-center text-xs font-medium ${cor}`}>
+      <Icon className="mr-1 h-3 w-3" />
+      {positivo ? "+" : ""}
+      {diff}
+      {sufixo} vs 7d anteriores
+    </span>
+  );
+}
 
 export default async function InicioPage({
   searchParams,
@@ -26,34 +80,37 @@ export default async function InicioPage({
   if (!session?.user) return null;
   const userId = session.user.id;
 
-  const [perfil, trilha, redacoesCount, revisoesPendentes, semana] =
-    await Promise.all([
-      prisma.studentProfile.findUnique({ where: { userId } }),
-      prisma.trackItem.findMany({
-        where: { userId, concluido: false },
-        orderBy: { ordem: "asc" },
-        take: 1,
-      }),
-      prisma.essay.count({ where: { userId } }),
-      prisma.revisao.count({
-        where: { userId, proximaRevisao: { lte: new Date() } },
-      }),
-      (async () => {
-        const desde = new Date();
-        desde.setDate(desde.getDate() - 7);
-        const attempts = await prisma.attempt.findMany({
-          where: { userId, createdAt: { gte: desde } },
-        });
-        const acertos = attempts.filter((a) => a.correta).length;
-        return {
-          total: attempts.length,
-          acertos,
-          pct: attempts.length
-            ? Math.round((acertos / attempts.length) * 100)
-            : 0,
-        };
-      })(),
-    ]);
+  const [
+    perfil,
+    trilha,
+    redacoesCount,
+    revisoesPendentes,
+    proximaRevisao,
+    rank,
+    dias7,
+  ] = await Promise.all([
+    prisma.studentProfile.findUnique({ where: { userId } }),
+    prisma.trackItem.findMany({
+      where: { userId, concluido: false },
+      orderBy: { ordem: "asc" },
+      take: 1,
+    }),
+    prisma.essay.count({ where: { userId } }),
+    prisma.revisao.count({
+      where: { userId, proximaRevisao: { lte: new Date() } },
+    }),
+    prisma.revisao.findFirst({
+      where: { userId },
+      orderBy: { proximaRevisao: "asc" },
+      include: { question: { select: { area: true, conteudo: true } } },
+    }),
+    ranking7d(userId),
+    ultimosNDias(userId, 7),
+  ]);
+
+  const missaoHoje = await getOuCriarMissaoHoje(userId);
+  const missao = missaoHoje ? progressoMissao(missaoHoje) : null;
+  const nivel = nivelDeXP(perfil?.xp ?? 0);
 
   const upgraded = searchParams?.upgraded === "1";
 
@@ -75,12 +132,25 @@ export default async function InicioPage({
     SIMULADO: "Simulado",
   };
 
+  const pctAcertos7d =
+    rank.questoesAtual > 0
+      ? Math.round((rank.acertosAtual / rank.questoesAtual) * 100)
+      : 0;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Olá, {session.user.name?.split(" ")[0] ?? "estudante"}
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Olá, {session.user.name?.split(" ")[0] ?? "estudante"}
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            {nivel.info.emoji} {nivel.info.label} • {nivel.xp} XP
+            {nivel.faltaParaProximo > 0
+              ? ` • faltam ${nivel.faltaParaProximo} XP pro próximo`
+              : " • nível máximo"}
+          </p>
+        </div>
         <Link href="/questoes/proxima">
           <Button>
             Continuar treino <ArrowRight className="ml-1 h-4 w-4" />
@@ -96,6 +166,106 @@ export default async function InicioPage({
           Plano Pro ativado. Aproveite as questões e simulados ilimitados.
         </div>
       ) : null}
+
+      {/* Faixa de gamificação: nível + streak + missão */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-2xl">
+                {nivel.info.emoji}
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-slate-500">Nível</div>
+                <div className="text-base font-semibold text-slate-900">
+                  {nivel.info.label}
+                </div>
+              </div>
+            </div>
+            <div
+              className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+              role="progressbar"
+              aria-valuenow={Math.round(nivel.progresso * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="h-full bg-indigo-500"
+                style={{ width: `${Math.round(nivel.progresso * 100)}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {nivel.xp} XP
+              {nivel.faltaParaProximo > 0
+                ? ` • faltam ${nivel.faltaParaProximo} pro próximo nível`
+                : ""}
+            </p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+                <Flame className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-slate-500">Streak atual</div>
+                <div className="text-base font-semibold text-slate-900">
+                  {perfil?.streakDias ?? 0} dia
+                  {(perfil?.streakDias ?? 0) === 1 ? "" : "s"}
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              Melhor: <strong>{perfil?.melhorStreak ?? 0} dias</strong>
+            </p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <Target className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-slate-500">Missão diária</div>
+                <div className="text-base font-semibold text-slate-900">
+                  {missao && missao.total > 0
+                    ? `${missao.feito}/${missao.total}`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+            {missao && missao.total > 0 ? (
+              <>
+                <div
+                  className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+                  role="progressbar"
+                  aria-valuenow={missao.pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full bg-emerald-500"
+                    style={{ width: `${missao.pct}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {missao.completa
+                    ? "Missão concluída"
+                    : `${missao.pct}% concluído`}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">
+                Faça o diagnóstico pra desbloquear missões.
+              </p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Próxima ação */}
@@ -125,8 +295,8 @@ export default async function InicioPage({
                     proximoItem.tipo === "REDACAO"
                       ? "/redacao/nova"
                       : proximoItem.tipo === "SIMULADO"
-                      ? "/simulado"
-                      : `/questoes/proxima?trackItemId=${proximoItem.id}`
+                        ? "/simulado"
+                        : `/questoes/proxima?trackItemId=${proximoItem.id}`
                   }
                 >
                   <Button size="sm">
@@ -149,40 +319,65 @@ export default async function InicioPage({
           </CardBody>
         </Card>
 
-        {/* Resumo da semana */}
+        {/* Resumo da semana com comparativo */}
         <Card>
           <CardHeader>
             <h2 className="text-sm font-semibold text-slate-900">
-              Resumo da semana
+              Últimos 7 dias
             </h2>
           </CardHeader>
           <CardBody>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <div className="text-2xl font-bold text-slate-900">
-                  {semana.total}
+                  {rank.questoesAtual}
                 </div>
                 <div className="text-xs text-slate-500">questões</div>
+                <div className="mt-1">
+                  <Delta
+                    atual={rank.questoesAtual}
+                    anterior={rank.questoesAnterior}
+                  />
+                </div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-emerald-600">
-                  {semana.pct}%
+                  {pctAcertos7d}%
                 </div>
                 <div className="text-xs text-slate-500">acertos</div>
+                <div className="mt-1">
+                  <Delta
+                    atual={rank.acertosAtual}
+                    anterior={rank.acertosAnterior}
+                  />
+                </div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-indigo-600">
-                  {redacoesCount}
+                  {fmtTempo(rank.tempoAtual)}
                 </div>
-                <div className="text-xs text-slate-500">redações totais</div>
+                <div className="text-xs text-slate-500">tempo estudo</div>
+                <div className="mt-1">
+                  <Delta
+                    atual={Math.round(rank.tempoAtual / 60)}
+                    anterior={Math.round(rank.tempoAnterior / 60)}
+                    sufixo="min"
+                  />
+                </div>
               </div>
             </div>
-            <p className="mt-4 text-xs text-slate-500">
-              Nota estimada ENEM:{" "}
-              <strong className="text-slate-900">
-                {perfil?.notaEstimadaEnem ?? "—"}
-              </strong>
-            </p>
+            <div className="mt-4 flex items-center justify-between text-xs">
+              <span className="text-slate-500">
+                Nota estimada ENEM:{" "}
+                <strong className="text-slate-900">
+                  {perfil?.notaEstimadaEnem ?? "—"}
+                </strong>
+              </span>
+              <span className="text-slate-500">
+                XP da semana:{" "}
+                <strong className="text-slate-900">{rank.xpAtual}</strong>
+              </span>
+            </div>
           </CardBody>
         </Card>
 
@@ -202,7 +397,7 @@ export default async function InicioPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-semibold text-slate-900">
-              Revisões pendentes
+              Revisões
             </h2>
           </CardHeader>
           <CardBody>
@@ -218,18 +413,59 @@ export default async function InicioPage({
                   </Button>
                 </Link>
               </div>
+            ) : proximaRevisao ? (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-600">
+                  Sem revisões pra hoje. Próxima:
+                </p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">
+                    {proximaRevisao.question.area} •{" "}
+                    {proximaRevisao.question.conteudo}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {proximaRevisao.proximaRevisao.toLocaleDateString("pt-BR")}
+                  </div>
+                </div>
+              </div>
             ) : (
               <EmptyState
                 icon={<BookCheck className="h-6 w-6" />}
-                title="Sem revisões hoje"
-                description="Bons hábitos. Volte amanhã pra manter o ritmo."
+                title="Nenhuma revisão agendada"
+                description="Responda algumas questões pra começar a revisar com espaçamento."
               />
             )}
           </CardBody>
         </Card>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Atividade dos últimos 7 dias */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Atividade diária
+            </h2>
+            <Link
+              href="/painel"
+              className="text-xs font-medium text-indigo-600 hover:underline"
+            >
+              Ver painel completo
+            </Link>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <BarChart
+            data={dias7.map((d) => ({ label: d.label, value: d.questoes }))}
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            Questões respondidas por dia.
+          </p>
+        </CardBody>
+      </Card>
+
+      {/* Atalhos */}
+      <div className="grid gap-3 sm:grid-cols-4">
         <Link href="/questoes" className="block">
           <Card className="transition hover:border-indigo-300">
             <CardBody>
@@ -251,7 +487,7 @@ export default async function InicioPage({
                 Redação
               </h3>
               <p className="text-xs text-slate-500">
-                Envie texto pra correção.
+                Envie texto pra correção. Total: {redacoesCount}
               </p>
             </CardBody>
           </Card>
@@ -265,6 +501,19 @@ export default async function InicioPage({
               </h3>
               <p className="text-xs text-slate-500">
                 Avalie como estaria hoje.
+              </p>
+            </CardBody>
+          </Card>
+        </Link>
+        <Link href="/painel" className="block">
+          <Card className="transition hover:border-indigo-300">
+            <CardBody>
+              <Trophy className="h-5 w-5 text-indigo-600" />
+              <h3 className="mt-2 text-sm font-semibold text-slate-900">
+                Painel
+              </h3>
+              <p className="text-xs text-slate-500">
+                Suas estatísticas completas.
               </p>
             </CardBody>
           </Card>

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   Route,
+  Map,
+  BarChart3,
   ListChecks,
   PenLine,
   Trophy,
@@ -24,6 +26,8 @@ export function Sidebar({ role }: SidebarProps) {
   const links = [
     { href: "/inicio", label: "Início", icon: Home },
     { href: "/trilha", label: "Trilha", icon: Route },
+    { href: "/mapa", label: "Mapa", icon: Map },
+    { href: "/painel", label: "Painel", icon: BarChart3 },
     { href: "/questoes", label: "Questões", icon: ListChecks },
     { href: "/redacao", label: "Redação", icon: PenLine },
     { href: "/simulado", label: "Simulados", icon: Trophy },
