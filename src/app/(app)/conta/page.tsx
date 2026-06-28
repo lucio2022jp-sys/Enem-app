@@ -8,6 +8,7 @@ import { nivelDeXP } from "@/lib/gamificacao";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { PortalAssinaturaButton } from "@/components/PortalAssinaturaButton";
 import { AREAS, AREA_LABELS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,20 @@ export default async function ContaPage() {
               </dd>
             </div>
           </dl>
+          {session.user.plan === "PRO" ? (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-2 text-xs text-slate-500">
+                Atualizar cartão, baixar recibo ou cancelar a assinatura:
+              </p>
+              <PortalAssinaturaButton />
+            </div>
+          ) : (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <Link href="/planos">
+                <Button size="sm">Conhecer o Pro</Button>
+              </Link>
+            </div>
+          )}
         </CardBody>
       </Card>
 

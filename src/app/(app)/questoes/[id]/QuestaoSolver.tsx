@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { QuestionPlayer, type PlayerQuestion } from "@/components/QuestionPlayer";
+import { IATutorButton } from "@/components/IATutorButton";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -64,20 +65,23 @@ export function QuestaoSolver({ question }: SolverProps) {
       <QuestionPlayer question={question} onAnswer={onAnswer} />
 
       {respondida ? (
-        <div className="flex flex-wrap gap-2">
-          <Link href="/questoes/proxima">
-            <Button>
-              Próxima questão <ArrowRight className="ml-1 h-4 w-4" />
+        <>
+          <IATutorButton questionId={question.id} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/questoes/proxima">
+              <Button>
+                Próxima questão <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              onClick={buscarSemelhantes}
+              loading={carregandoSemelhantes}
+            >
+              <Sparkles className="mr-1 h-4 w-4" /> Ver semelhantes
             </Button>
-          </Link>
-          <Button
-            variant="outline"
-            onClick={buscarSemelhantes}
-            loading={carregandoSemelhantes}
-          >
-            <Sparkles className="mr-1 h-4 w-4" /> Ver semelhantes
-          </Button>
-        </div>
+          </div>
+        </>
       ) : null}
 
       {erroSemelhantes ? (

@@ -204,12 +204,95 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* Exemplo redação */}
+        <section className="border-t border-slate-100 bg-slate-50 py-16">
+          <div className="mx-auto max-w-4xl px-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="max-w-xl">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <PenLine className="h-3 w-3" /> Exemplo público
+                  </span>
+                  <h3 className="mt-3 text-2xl font-semibold text-slate-900">
+                    Veja como a IA corrige uma redação
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Tem um modelo real corrigido pela nossa IA, com nota por
+                    competência, comentários e versão reescrita. Use pra
+                    entender o nível de detalhe antes de enviar a sua.
+                  </p>
+                </div>
+                <Link href="/redacao-exemplo">
+                  <Button>Ver exemplo corrigido</Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="border-t border-slate-100 bg-white py-16">
+          <div className="mx-auto max-w-3xl px-6">
+            <h2 className="text-center text-2xl font-bold text-slate-900">
+              Perguntas frequentes
+            </h2>
+            <div className="mt-8 space-y-3">
+              {[
+                {
+                  p: "Posso cancelar a assinatura quando quiser?",
+                  r: "Sim. Não tem fidelidade. Você cancela pela página Minha conta e mantém o acesso até o fim do período pago.",
+                },
+                {
+                  p: "A correção é só por IA?",
+                  r: "A correção principal é IA, com nota nas 5 competências e versão reescrita. No Pro, dá pra solicitar revisão humana por professor parceiro.",
+                },
+                {
+                  p: "As questões são oficiais do ENEM?",
+                  r: "Temos uma base de questões inspiradas no padrão ENEM. A IA também gera questões inéditas focadas nas suas dificuldades.",
+                },
+                {
+                  p: "Funciona no celular?",
+                  r: "Sim, a plataforma é responsiva. Você pode treinar pelo navegador do celular sem precisar baixar app.",
+                },
+                {
+                  p: "Posso testar antes de pagar?",
+                  r: "O plano Free dá acesso ao diagnóstico, banco de questões e correção limitada de redação. Você só assina o Pro quando quiser tirar os limites.",
+                },
+              ].map((q, i) => (
+                <details
+                  key={i}
+                  className="group rounded-xl border border-slate-200 bg-white p-4 transition open:bg-slate-50"
+                >
+                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium text-slate-900">
+                    {q.p}
+                    <span className="text-slate-400 group-open:rotate-45 transition">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-2 text-sm text-slate-600">{q.r}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-slate-500 sm:flex-row">
           <Logo />
-          <p>© {new Date().getFullYear()} ENEM Treino. Feito pra treinar.</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/redacao-exemplo" className="hover:text-slate-900">
+              Exemplo de redação
+            </Link>
+            <Link href="/termos" className="hover:text-slate-900">
+              Termos
+            </Link>
+            <Link href="/privacidade" className="hover:text-slate-900">
+              Privacidade
+            </Link>
+            <span>© {new Date().getFullYear()} ENEM Treino.</span>
+          </div>
         </div>
       </footer>
     </div>

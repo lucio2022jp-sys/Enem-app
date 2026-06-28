@@ -10,6 +10,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { QUESTOES_LOTE2 } from "./seed-questoes-lote2";
 
 const prisma = new PrismaClient();
 
@@ -537,6 +538,45 @@ async function main() {
   console.log(`✅ Seed concluído.`);
   console.log(`   - ${QUESTOES.length} questões`);
   console.log(`   - 2 usuários (aluno@teste.com / professor@teste.com — senha: 123456)`);
+
+  // Lote 2 — questões compactas para popular o banco
+  let extras = 0;
+  for (const q of QUESTOES_LOTE2) {
+    await prisma.question.upsert({
+      where: { id: q.id },
+      create: {
+        id: q.id,
+        year: q.year,
+        area: q.area,
+        disciplina: q.disciplina,
+        competencia: "",
+        habilidade: "",
+        conteudo: q.conteudo,
+        subconteudo: null,
+        enunciado: q.enunciado,
+        alternativaA: q.alternativaA,
+        alternativaB: q.alternativaB,
+        alternativaC: q.alternativaC,
+        alternativaD: q.alternativaD,
+        alternativaE: q.alternativaE,
+        correta: q.correta,
+        comentario: q.comentario,
+        resolucaoPassoPasso: q.comentario,
+        explicacaoSimplificada: q.comentario,
+        explicacaoDetalhada: q.comentario,
+        conceitosJson: "[]",
+        assuntosRelacionadosJson: "[]",
+        dicasJson: "[]",
+        dificuldade: q.dificuldade,
+        tempoMedioSegundos: q.tempoMedioSegundos ?? 180,
+        geradaPorIA: false,
+        tagsJson: "[]",
+      },
+      update: {},
+    });
+    extras++;
+  }
+  console.log(`   - +${extras} questões do lote 2`);
 }
 
 main()
