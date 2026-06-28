@@ -36,9 +36,14 @@ export default async function RedacaoPage() {
             Suas redações enviadas e correções.
           </p>
         </div>
-        <Link href="/redacao/nova">
-          <Button>Nova redação</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/redacao-exemplo" target="_blank">
+            <Button variant="outline">Ver exemplo corrigido</Button>
+          </Link>
+          <Link href="/redacao/nova">
+            <Button>Nova redação</Button>
+          </Link>
+        </div>
       </header>
 
       {redacoes.length === 0 ? (
@@ -47,9 +52,14 @@ export default async function RedacaoPage() {
           title="Nenhuma redação ainda"
           description="Comece com a primeira. A IA dá nota nas 5 competências e um professor pode revisar."
           action={
-            <Link href="/redacao/nova">
-              <Button>Começar agora</Button>
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Link href="/redacao-exemplo" target="_blank">
+                <Button variant="outline">Ver exemplo</Button>
+              </Link>
+              <Link href="/redacao/nova">
+                <Button>Começar agora</Button>
+              </Link>
+            </div>
           }
         />
       ) : (
