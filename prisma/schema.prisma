@@ -32,6 +32,7 @@ model User {
   horarioPreferido     String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  aceitouTermosEm      DateTime?
 
   attempts           Attempt[]
   essays             Essay[]           @relation("AlunoEssays")
@@ -43,8 +44,57 @@ model User {
   revisoes           Revisao[]
   missoes            MissaoDiaria[]
   dailyStats         DailyStats[]
+  passwordResetTokens PasswordResetToken[]
+  badges             UserBadge[]
+
+  // Stripe billing
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  planUntil            DateTime?
 
   @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Badge {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  titulo      String
+  descricao   String
+  icone       String  @default("🏅")
+  xpRecompensa Int    @default(50)
+  // categoria: QUESTOES | REDACAO | SIMULADO | STREAK | DIAGNOSTICO | ESPECIAL
+  categoria   String  @default("ESPECIAL")
+  ordem       Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  users UserBadge[]
+}
+
+model UserBadge {
+  id          String   @id @default(cuid())
+  userId      String
+  badgeId     String
+  conquistadoEm DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
 }
 
 model StudentProfile {
