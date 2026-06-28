@@ -3,6 +3,7 @@ import { adicionarXP, XP_POR_EVENTO } from "@/lib/gamificacao";
 import { registrarEstudoHoje } from "@/lib/streak";
 import { incrementarProgresso, tipoParaArea, getOuCriarMissaoHoje } from "@/lib/missao";
 import { progressoMissao, XP_MISSAO_DIARIA } from "@/lib/missao";
+import { verificarBadges } from "@/lib/conquistas";
 import type { Area } from "@/types";
 
 interface AggregatedResult {
@@ -13,6 +14,7 @@ interface AggregatedResult {
   novoNivelLabel?: string;
   streakDias: number;
   missaoCompleta: boolean;
+  conquistas?: string[];
 }
 
 /**
@@ -35,10 +37,14 @@ export async function aoResponderQuestao(input: {
   const streak = await registrarEstudoHoje(input.userId);
   const xpRes = await adicionarXP(input.userId, xpDelta);
   const prog = await incrementarProgresso(input.userId, tipoParaArea(input.area));
+  const conquistasQ = await verificarBadges(input.userId, "QUESTAO");
+  const conquistasS = await verificarBadges(input.userId, "STREAK");
+  const conquistas = [...conquistasQ, ...conquistasS];
   let missaoCompleta = prog.premiada;
   if (prog.premiada) {
     const xp2 = await adicionarXP(input.userId, XP_MISSAO_DIARIA);
     await upsertDaily(input.userId, { xp: XP_MISSAO_DIARIA });
+    const conquistasM = await verificarBadges(input.userId, "MISSAO");
     return {
       xp: xp2.xp,
       nivel: xp2.nivel,
@@ -47,6 +53,7 @@ export async function aoResponderQuestao(input: {
       novoNivelLabel: (xp2.novoNivel ?? xpRes.novoNivel)?.label,
       streakDias: streak.streakDias,
       missaoCompleta,
+      conquistas: [...conquistas, ...conquistasM],
     };
   }
   return {
@@ -57,6 +64,7 @@ export async function aoResponderQuestao(input: {
     novoNivelLabel: xpRes.novoNivel?.label,
     streakDias: streak.streakDias,
     missaoCompleta,
+    conquistas,
   };
 }
 
@@ -67,9 +75,13 @@ export async function aoEnviarRedacao(userId: string): Promise<AggregatedResult>
   const streak = await registrarEstudoHoje(userId);
   const xpRes = await adicionarXP(userId, xpDelta);
   const prog = await incrementarProgresso(userId, "REDACAO");
+  const conquistasR = await verificarBadges(userId, "REDACAO");
+  const conquistasS = await verificarBadges(userId, "STREAK");
+  const conquistas = [...conquistasR, ...conquistasS];
   if (prog.premiada) {
     const xp2 = await adicionarXP(userId, XP_MISSAO_DIARIA);
     await upsertDaily(userId, { xp: XP_MISSAO_DIARIA });
+    const conquistasM = await verificarBadges(userId, "MISSAO");
     return {
       xp: xp2.xp,
       nivel: xp2.nivel,
@@ -78,6 +90,7 @@ export async function aoEnviarRedacao(userId: string): Promise<AggregatedResult>
       novoNivelLabel: (xp2.novoNivel ?? xpRes.novoNivel)?.label,
       streakDias: streak.streakDias,
       missaoCompleta: true,
+      conquistas: [...conquistas, ...conquistasM],
     };
   }
   return {
@@ -88,6 +101,7 @@ export async function aoEnviarRedacao(userId: string): Promise<AggregatedResult>
     novoNivelLabel: xpRes.novoNivel?.label,
     streakDias: streak.streakDias,
     missaoCompleta: false,
+    conquistas,
   };
 }
 
@@ -97,6 +111,7 @@ export async function aoConcluirRevisao(userId: string): Promise<void> {
   await registrarEstudoHoje(userId);
   await adicionarXP(userId, 2);
   await incrementarProgresso(userId, "REVISAO");
+  await verificarBadges(userId, "STREAK");
 }
 
 /** Gancho pós-finalização de simulado. */
@@ -109,6 +124,10 @@ export async function aoFinalizarSimulado(input: {
   await upsertDaily(input.userId, { xp });
   const streak = await registrarEstudoHoje(input.userId);
   const xpRes = await adicionarXP(input.userId, xp);
+  const conquistas = [
+    ...(await verificarBadges(input.userId, "SIMULADO")),
+    ...(await verificarBadges(input.userId, "STREAK")),
+  ];
   return {
     xp: xpRes.xp,
     nivel: xpRes.nivel,
@@ -117,6 +136,7 @@ export async function aoFinalizarSimulado(input: {
     novoNivelLabel: xpRes.novoNivel?.label,
     streakDias: streak.streakDias,
     missaoCompleta: false,
+    conquistas,
   };
 }
 
@@ -125,6 +145,7 @@ export async function aoFinalizarDiagnostico(userId: string): Promise<void> {
   await upsertDaily(userId, { xp: XP_POR_EVENTO.diagnostico });
   await registrarEstudoHoje(userId);
   await adicionarXP(userId, XP_POR_EVENTO.diagnostico);
+  await verificarBadges(userId, "DIAGNOSTICO");
 }
 
 /** Garante existência da missão de hoje e retorna progresso. */

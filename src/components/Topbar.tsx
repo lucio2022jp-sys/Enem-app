@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Badge } from "./ui/Badge";
 import { Logo } from "./Logo";
+import { UserMenu } from "./UserMenu";
 
 interface TopbarProps {
   nome: string;
@@ -18,14 +18,7 @@ export function Topbar({ nome, plano }: TopbarProps) {
       <div className="hidden text-sm text-slate-500 md:block">
         Bom estudo, foco no treino.
       </div>
-      <div className="flex items-center gap-3">
-        <Badge tone={plano === "PRO" ? "indigo" : "default"}>
-          {plano === "PRO" ? "Plano Pro" : "Plano Free"}
-        </Badge>
-        <span className="hidden text-sm font-medium text-slate-700 sm:inline">
-          {nome}
-        </span>
-      </div>
+      <UserMenu nome={nome} plano={plano} />
     </header>
   );
 }

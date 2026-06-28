@@ -15,6 +15,8 @@ const APP_PREFIXES = [
   "/planos",
   "/mapa",
   "/painel",
+  "/missao",
+  "/revisao",
 ];
 
 const PROFESSOR_PREFIX = "/professor";

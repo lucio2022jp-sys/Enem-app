@@ -7,6 +7,8 @@ import {
   Route,
   Map,
   BarChart3,
+  Target,
+  RefreshCw,
   ListChecks,
   PenLine,
   Trophy,
@@ -25,7 +27,9 @@ export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const links = [
     { href: "/inicio", label: "Início", icon: Home },
+    { href: "/missao", label: "Missão", icon: Target },
     { href: "/trilha", label: "Trilha", icon: Route },
+    { href: "/revisao", label: "Revisão", icon: RefreshCw },
     { href: "/mapa", label: "Mapa", icon: Map },
     { href: "/painel", label: "Painel", icon: BarChart3 },
     { href: "/questoes", label: "Questões", icon: ListChecks },
