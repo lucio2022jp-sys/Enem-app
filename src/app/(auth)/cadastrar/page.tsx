@@ -16,6 +16,9 @@ const schema = z.object({
   name: z.string().min(2, "Informe seu nome"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Mínimo de 6 caracteres"),
+  aceiteTermos: z.literal(true, {
+    errorMap: () => ({ message: "Você precisa aceitar os termos." }),
+  }),
 });
 
 type Form = z.infer<typeof schema>;
@@ -42,6 +45,7 @@ export default function CadastrarPage() {
           name: data.name,
           email: data.email.toLowerCase(),
           password: data.password,
+          aceiteTermos: data.aceiteTermos,
         }),
       });
       if (!res.ok) {
@@ -110,6 +114,27 @@ export default function CadastrarPage() {
             >
               {erro}
             </div>
+          ) : null}
+          <label className="flex items-start gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              {...register("aceiteTermos")}
+            />
+            <span>
+              Aceito os{" "}
+              <Link href="/termos" className="text-indigo-600 hover:underline" target="_blank">
+                Termos de uso
+              </Link>{" "}
+              e a{" "}
+              <Link href="/privacidade" className="text-indigo-600 hover:underline" target="_blank">
+                Política de Privacidade
+              </Link>
+              .
+            </span>
+          </label>
+          {errors.aceiteTermos ? (
+            <p className="text-xs text-rose-600">{errors.aceiteTermos.message}</p>
           ) : null}
           <Button type="submit" loading={carregando} className="w-full">
             Criar conta

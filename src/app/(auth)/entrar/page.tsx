@@ -82,6 +82,11 @@ function EntrarForm() {
       <Button type="submit" loading={carregando} className="w-full">
         Entrar
       </Button>
+      <p className="text-center text-sm">
+        <Link href="/esqueci-senha" className="text-indigo-600 hover:underline">
+          Esqueci minha senha
+        </Link>
+      </p>
     </form>
   );
 }
