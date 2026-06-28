@@ -8,6 +8,59 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { cn, formatarMinutos, AREA_LABELS } from "@/lib/utils";
 import type { Alternativa } from "@/types";
 
+const TIPO_ERRO_LABEL: Record<string, { titulo: string; descricao: string; emoji: string }> = {
+  CONHECIMENTO: {
+    emoji: "📚",
+    titulo: "Falta de conteúdo",
+    descricao: "O conceito da questão ainda não está fixado. Vale estudar a teoria antes de tentar de novo.",
+  },
+  INTERPRETACAO: {
+    emoji: "🔍",
+    titulo: "Interpretação",
+    descricao: "Você entendeu o conteúdo, mas leu o enunciado de forma diferente do que ele pedia.",
+  },
+  CALCULO: {
+    emoji: "🧮",
+    titulo: "Erro de cálculo",
+    descricao: "O raciocínio estava certo, mas tropeçou em uma conta. Reveja com calma.",
+  },
+  DISTRACAO: {
+    emoji: "😅",
+    titulo: "Distração",
+    descricao: "Resposta rápida demais. Cuidado com erro bobo nos próximos.",
+  },
+  TEMPO: {
+    emoji: "⏱️",
+    titulo: "Falta de tempo",
+    descricao: "Você gastou mais tempo do que o esperado. Treine resolver mais rápido.",
+  },
+  GRAFICO: {
+    emoji: "📊",
+    titulo: "Leitura de gráfico",
+    descricao: "Erro foi na interpretação visual. Reveja os eixos e legendas.",
+  },
+  TABELA: {
+    emoji: "📋",
+    titulo: "Leitura de tabela",
+    descricao: "Cuidado com linhas e colunas. Releia os dados com atenção.",
+  },
+  RACIOCINIO: {
+    emoji: "🧠",
+    titulo: "Falha lógica",
+    descricao: "Salto no raciocínio. Tente quebrar em passos menores.",
+  },
+  CONCEITUAL: {
+    emoji: "💡",
+    titulo: "Confusão de conceito",
+    descricao: "Conceitos parecidos foram confundidos. Compare os dois antes de prosseguir.",
+  },
+  ESTRATEGIA: {
+    emoji: "♟️",
+    titulo: "Estratégia ruim",
+    descricao: "Tinha caminho mais curto. Considere abordagens alternativas.",
+  },
+};
+
 export interface PlayerQuestion {
   id: string;
   area: string;
@@ -206,14 +259,29 @@ export function QuestionPlayer({
               {resultado.correta
                 ? "Resposta correta. Bom trabalho."
                 : `Resposta incorreta. Gabarito: ${correta}.`}
-              {resultado.tipoErro && resultado.tipoErro !== "NENHUM" ? (
-                <span className="ml-2 text-xs font-normal">
-                  Tipo de erro identificado: <strong>{resultado.tipoErro}</strong>
-                </span>
-              ) : null}
             </div>
 
-            {resultado.explicacaoErro ? (
+            {resultado.tipoErro && resultado.tipoErro !== "NENHUM" && TIPO_ERRO_LABEL[resultado.tipoErro] ? (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <span className="text-2xl leading-none" aria-hidden>
+                  {TIPO_ERRO_LABEL[resultado.tipoErro].emoji}
+                </span>
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    {TIPO_ERRO_LABEL[resultado.tipoErro].titulo}
+                  </p>
+                  <p className="mt-0.5 text-amber-900/90">
+                    {TIPO_ERRO_LABEL[resultado.tipoErro].descricao}
+                  </p>
+                  {resultado.explicacaoErro ? (
+                    <p className="mt-2 text-amber-900/90">
+                      <strong className="font-semibold">Análise da IA: </strong>
+                      {resultado.explicacaoErro}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : resultado.explicacaoErro ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 <strong className="font-semibold">Onde você tropeçou: </strong>
                 {resultado.explicacaoErro}

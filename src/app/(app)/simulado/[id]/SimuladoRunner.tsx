@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -43,12 +43,40 @@ export function SimuladoRunner({
   const [respostas, setRespostas] =
     useState<Record<string, string>>(respostasIniciais);
   const [enviando, setEnviando] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [salvando, setSalvando] = useState<"OK" | "SALVANDO" | "ERRO">("OK");
   const [restante, setRestante] = useState<number>(0);
+  const ultimoSalvoRef = useRef<string>(JSON.stringify(respostasIniciais));
 
   const fim = useMemo(() => {
     const inicio = new Date(iniciadoEm).getTime();
     return inicio + duracaoMin * 60_000;
   }, [iniciadoEm, duracaoMin]);
+
+  // Autosave debounced: salva 800ms depois da última mudança
+  useEffect(() => {
+    const atual = JSON.stringify(respostas);
+    if (atual === ultimoSalvoRef.current) return;
+    setSalvando("SALVANDO");
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/simulado/${id}/salvar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ respostas }),
+        });
+        if (r.ok) {
+          ultimoSalvoRef.current = atual;
+          setSalvando("OK");
+        } else {
+          setSalvando("ERRO");
+        }
+      } catch {
+        setSalvando("ERRO");
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [respostas, id]);
 
   useEffect(() => {
     function tick() {
@@ -89,6 +117,24 @@ export function SimuladoRunner({
     }
   }
 
+  async function cancelar() {
+    if (cancelando) return;
+    const ok = window.confirm(
+      "Tem certeza que quer cancelar este simulado? Suas respostas serão perdidas.",
+    );
+    if (!ok) return;
+    setCancelando(true);
+    try {
+      const r = await fetch(`/api/simulado/${id}/cancelar`, { method: "POST" });
+      if (r.ok) {
+        router.push("/simulado");
+        router.refresh();
+      }
+    } finally {
+      setCancelando(false);
+    }
+  }
+
   if (!q) {
     return (
       <p className="text-sm text-slate-600">
@@ -105,16 +151,33 @@ export function SimuladoRunner({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-slate-900">{titulo}</h1>
-          <div
-            className={cn(
-              "rounded-md px-3 py-1 font-mono text-sm",
-              restante < 60_000
-                ? "bg-rose-100 text-rose-700"
-                : "bg-slate-100 text-slate-700",
-            )}
-            aria-live="polite"
-          >
-            {String(min).padStart(2, "0")}:{String(seg).padStart(2, "0")}
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-xs",
+                salvando === "OK" && "text-emerald-600",
+                salvando === "SALVANDO" && "text-slate-500",
+                salvando === "ERRO" && "text-rose-600",
+              )}
+              aria-live="polite"
+            >
+              {salvando === "OK"
+                ? "Salvo"
+                : salvando === "SALVANDO"
+                  ? "Salvando..."
+                  : "Falha ao salvar"}
+            </span>
+            <div
+              className={cn(
+                "rounded-md px-3 py-1 font-mono text-sm",
+                restante < 60_000
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-slate-100 text-slate-700",
+              )}
+              aria-live="polite"
+            >
+              {String(min).padStart(2, "0")}:{String(seg).padStart(2, "0")}
+            </div>
           </div>
         </div>
 
@@ -221,6 +284,15 @@ export function SimuladoRunner({
               loading={enviando}
             >
               Finalizar simulado
+            </Button>
+            <Button
+              className="mt-2 w-full"
+              variant="ghost"
+              onClick={cancelar}
+              loading={cancelando}
+              disabled={enviando}
+            >
+              Cancelar
             </Button>
           </CardBody>
         </Card>

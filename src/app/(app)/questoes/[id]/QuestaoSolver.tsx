@@ -8,6 +8,7 @@ import { IATutorButton } from "@/components/IATutorButton";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import type { Alternativa } from "@/types";
 
 interface SolverProps {
@@ -19,6 +20,7 @@ export function QuestaoSolver({ question }: SolverProps) {
   const [semelhantes, setSemelhantes] = useState<any[] | null>(null);
   const [erroSemelhantes, setErroSemelhantes] = useState<string | null>(null);
   const [respondida, setRespondida] = useState(false);
+  const { push } = useToast();
 
   async function onAnswer(escolhida: Alternativa, tempoSegundos: number) {
     const res = await fetch("/api/questoes/responder", {
@@ -36,6 +38,31 @@ export function QuestaoSolver({ question }: SolverProps) {
     }
     const data = await res.json();
     setRespondida(true);
+    // Toasts encadeados de ganhos
+    const g = data.ganhos;
+    if (g) {
+      setTimeout(() => {
+        if (data.correta) push(`+${5} XP ⚡`, "success");
+        else push(`+1 XP (errou, mas tentou)`, "info");
+      }, 100);
+      if (g.subiu && g.novoNivelLabel) {
+        setTimeout(() => {
+          push(`Subiu pro nível ${g.novoNivelLabel}! ${g.novoNivelEmoji ?? ""}`, "success");
+        }, 1100);
+      }
+      if (g.missaoCompleta) {
+        setTimeout(() => {
+          push("Missão do dia concluída! +50 XP 🎯", "success");
+        }, 2100);
+      }
+      if (Array.isArray(g.conquistas) && g.conquistas.length > 0) {
+        g.conquistas.forEach((slug: string, i: number) => {
+          setTimeout(() => {
+            push(`Nova conquista desbloqueada: ${slug.replace(/-/g, " ")} 🏅`, "success");
+          }, 3100 + i * 1000);
+        });
+      }
+    }
     return data;
   }
 
